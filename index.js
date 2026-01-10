@@ -1,6 +1,7 @@
 const express = require("express");
 const auth = require("./Controller/user/auth");
 const employee = require("./Controller/employee/employee");
+const admin = require("./Controller/admin/admin");
 const fileUpload = require("express-fileupload");
 var bodyParser = require("body-parser");
 
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use(fileUpload());
 app.use("/auth", auth);
 app.use("/employee", employee);
+app.use("/admin", admin);
 
 
 http.listen(port, () =>

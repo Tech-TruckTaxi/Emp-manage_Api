@@ -74,7 +74,6 @@ routes.post("/login", async function (req, res) {
         EmpId: result[0].LoginID,
         EmployeeName: result[0].name,
         LoginTime: new Date(),
-        LogIP: req.connection.remoteAddress,
       });
     }
 

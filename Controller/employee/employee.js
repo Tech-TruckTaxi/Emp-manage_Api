@@ -116,7 +116,7 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
       toDate: new Date(params.toDate),
       reason: params.reason,
       noOfDays: noOfDays,
-      leaveRequestTime: new Date(),
+      leaveReqTime: new Date(),
       status: "pending",
     });
 
@@ -165,7 +165,7 @@ routes.post("/addpermission", Dbaccess.authenticateToken, async function (req, r
     const diffMs = toDateTime - fromDateTime;
     const permissionHours = (diffMs / (1000 * 60 * 60)).toFixed(2);
 
-    // Generate permId (auto increment)
+    // Generate permId
     const lastPermission = await Dbaccess.getdata(
       "EmpPermission",
       {},
@@ -185,8 +185,8 @@ routes.post("/addpermission", Dbaccess.authenticateToken, async function (req, r
       fromTime: params.fromTime,
       toTime: params.toTime,
       reason: params.reason,
-      permissionHours: Number(permissionHours),
-      permissionRequestedDate: new Date(),
+      permHours: Number(permissionHours),
+      permReqDate: new Date(),
       status: "pending",
     });
 
@@ -206,26 +206,27 @@ routes.post("/addpermission", Dbaccess.authenticateToken, async function (req, r
 routes.get("/getemployeereport", Dbaccess.authenticateToken, async function (req, res) {
   try {
     const empId = req.query.empId;
-    const month = req.query.month;
-    const year = req.query.year;
+    const monthYear = req.query.monthYear; // yyyy-mm
 
-    if (!empId || !month || !year) {
+    if (!empId || !monthYear) {
       return res.status(400).json({
         status: 400,
-        message: "empId, month, and year are required",
+        message: "empId and monthYear (yyyy-mm) are required",
       });
     }
 
-    // Month start & end
-    const startDate = new Date(`${year}-${month}-01T00:00:00Z`);
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 1);
-    endDate.setMilliseconds(-1);
+    // Split yyyy-mm
+    // @ts-ignore
+    const [year, month] = monthYear.split("-");
 
-    // Get employee info from login collection
+    // Month start & end
+    const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+
+    // Employee Info
     const empDataArr = await Dbaccess.getdata(
-      "EmpLogin",
-      { EmpId: empId },
+      "login",
+      { LoginID: empId },
       {},
       {}
     );
@@ -256,11 +257,12 @@ routes.get("/getemployeereport", Dbaccess.authenticateToken, async function (req
 
     // Leave
     const leaveData = await Dbaccess.getdata(
-      "EmployeeLeave",
+      "EmpLeave",
       {
         empId: empId,
         fromDate: { $lte: endDate },
-        toDate: { $gte: startDate }
+        toDate: { $gte: startDate },
+        status: "approved",
       },
       {},
       {}
@@ -277,10 +279,11 @@ routes.get("/getemployeereport", Dbaccess.authenticateToken, async function (req
 
     // Permission
     const permissionData = await Dbaccess.getdata(
-      "EmployeePermission",
+      "EmpPermission",
       {
         empId: empId,
-        date: { $gte: startDate, $lte: endDate }
+        date: { $gte: startDate, $lte: endDate },
+        status: "approved",
       },
       {},
       {}
@@ -288,36 +291,32 @@ routes.get("/getemployeereport", Dbaccess.authenticateToken, async function (req
 
     const permission = permissionData.map(p => ({
       date: p.date.toISOString().split("T")[0],
-      hours: p.permissionHours
+      hours: p.permHours
     }));
 
-    const totalPermissionHours = permission.reduce((sum, p) => sum + p.hours, 0);
+    const totalPermHours = permission.reduce((sum, p) => sum + p.hours, 0);
 
-    // Total working days
-    const totalWorkingDays = (() => {
-      let count = 0;
-      let d = new Date(startDate);
-      while (d <= endDate) {
-        const day = d.getDay(); // 0-Sun,6-Sat
-        if (day !== 0 && day !== 6) count++;
-        d.setDate(d.getDate() + 1);
-      }
-      return count;
-    })();
+    // Total Working Days (Mon–Sat)
+    let totalWorkingDays = 0;
+    let d = new Date(startDate);
+    while (d <= endDate) {
+      const day = d.getDay();
+      if (day !== 0 && day !== 7) totalWorkingDays++;
+      d.setDate(d.getDate() + 1);
+    }
 
     res.status(200).json({
       employee: {
-        empId: empData.EmpId,
-        EmployeeName: empData.EmployeeName,
+        empId: empData.LoginID,
+        EmployeeName: empData.name,
         role: empData.role
       },
       summary: {
-        month: month,
-        year: year,
+        monthYear,
         totalWorkingDays,
         totalPresent,
         totalLeave,
-        totalPermissionHours
+        totalPermHours
       },
       attendance,
       leave,
@@ -329,6 +328,7 @@ routes.get("/getemployeereport", Dbaccess.authenticateToken, async function (req
     res.status(500).json({ status: 500, message: "Internal Server Error" });
   }
 });
+
 
 
 module.exports = routes;
