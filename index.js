@@ -9,7 +9,6 @@ const app = express();
 var http = require("http").Server(app);
 const port = 1212;
 
-
 app.use(bodyParser.urlencoded({ extended: false }));
 
 app.use(bodyParser.json());
@@ -18,7 +17,6 @@ app.use(fileUpload());
 app.use("/auth", auth);
 app.use("/employee", employee);
 app.use("/admin", admin);
-
 
 http.listen(port, () =>
   console.log("server Start running at localhost:" + port)

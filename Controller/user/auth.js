@@ -1,8 +1,8 @@
 const routes = require("express").Router();
-var jwt = require("jsonwebtoken");
-var config = require("../../config");
-var validation = require("../validation");
-var Dbaccess = require("../../Model/dbaccess");
+const jwt = require("jsonwebtoken");
+const config = require("../../config");
+const validation = require("../validation");
+const Dbaccess = require("../../Model/dbaccess");
 
 // Login
 routes.post("/login", async function (req, res) {
@@ -49,7 +49,7 @@ routes.post("/login", async function (req, res) {
     const logCheck = await Dbaccess.getdata(
       "EmpAttendance",
       {
-        EmpId: result[0].LoginID,
+        empId: result[0].LoginID,
         LoginTime: { $gte: startOfDay, $lte: endOfDay },
       },
       {},
@@ -66,12 +66,11 @@ routes.post("/login", async function (req, res) {
         { attendID: -1 }
       );
 
-      const attendID =
-        lastRecord.length > 0 ? lastRecord[0].attendID + 1 : 1;
+      const attendID = lastRecord.length > 0 ? lastRecord[0].attendID + 1 : 1;
 
       await Dbaccess.insertone("EmpAttendance", {
         attendID: attendID,
-        EmpId: result[0].LoginID,
+        empId: result[0].LoginID,
         EmployeeName: result[0].name,
         LoginTime: new Date(),
       });
@@ -93,8 +92,6 @@ routes.post("/login", async function (req, res) {
     });
   }
 });
-
-
 
 // Logout
 routes.post("/logout", Dbaccess.authenticateToken, async function (req, res) {
