@@ -28,7 +28,7 @@ routes.post(
       const attendance = await Dbaccess.getdata(
         "EmpAttendance",
         {
-          EmpId: params.empId,
+          empId: params.empId,
           LoginTime: { $gte: startOfDay, $lte: endOfDay },
         },
         {},
