@@ -122,7 +122,13 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
       leaveReqTime: new Date(),
       status: "pending",
     });
-
+    await Dbaccess.insertone("Ems_Notifications", {
+      empId: params.empId,
+      message: `Leave request submitted from ${params.fromDate} to ${params.toDate}`,
+      type: "Leave Request ",
+      sentDate: new Date(),
+      isRead: false,
+    });
     res.status(200).json({
       message: "Leave request submitted",
     });
@@ -196,6 +202,14 @@ routes.post(
         status: "pending",
       });
 
+      await Dbaccess.insertone("Ems_Notifications", {
+        empId: params.empId,
+        message: `Permission request submitted for ${params.date} from ${params.fromTime} to ${params.toTime}`,
+        type: "Permission Request ",
+        sentDate: new Date(),
+        isRead: false,
+      });
+      
       res.status(200).json({
         message: "Permission request submitted",
       });
@@ -255,7 +269,7 @@ routes.get(
       const attendanceData = await Dbaccess.getdata(
         "EmpAttendance",
         {
-          EmpId: empId,
+          empId: empId,
           LoginTime: { $gte: startDate, $lte: endDate },
         },
         {},

@@ -136,4 +136,22 @@ async function getdatacount(tablename, find) {
 
 exports.getdatacount = getdatacount;
 
+async function updatemany(tablename, data, key) {
+  try {
+    const client = await MongoClient.connect(uri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    const db = client.db('trucktaxi');
+    var response = await db.collection(tablename).updateMany(key, { $set: data })
+    client.close();
+    return true;
+  } catch (e) {
+    console.log(e);
+    return false;
+  }
+}
+
+exports.updatemany = updatemany;
+
 exports.uri = uri;
