@@ -32,7 +32,7 @@ routes.post(
           LoginTime: { $gte: startOfDay, $lte: endOfDay },
         },
         {},
-        {}
+        {},
       );
 
       if (attendance[0].isPresent === true) {
@@ -46,7 +46,7 @@ routes.post(
       await Dbaccess.updateone(
         "EmpAttendance",
         { isPresent: true, presentTime: new Date() },
-        { attendID: attendance[0].attendID }
+        { attendID: attendance[0].attendID },
       );
 
       res.status(200).json({
@@ -60,7 +60,7 @@ routes.post(
         message: "Internal Server Error",
       });
     }
-  }
+  },
 );
 
 // Add Leave
@@ -104,7 +104,7 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
       "EmpLeave",
       {},
       {},
-      { leaveId: -1 }
+      { leaveId: -1 },
     );
 
     const leaveId = lastLeave.length > 0 ? lastLeave[0].leaveId + 1 : 1;
@@ -182,7 +182,7 @@ routes.post(
         "EmpPermission",
         {},
         {},
-        { permId: -1 }
+        { permId: -1 },
       );
 
       const permId =
@@ -209,7 +209,7 @@ routes.post(
         sentDate: new Date(),
         isRead: false,
       });
-      
+
       res.status(200).json({
         message: "Permission request submitted",
       });
@@ -220,7 +220,7 @@ routes.post(
         message: "Internal Server Error",
       });
     }
-  }
+  },
 );
 
 //get Employee Report
@@ -254,7 +254,7 @@ routes.get(
         "login",
         { LoginID: empId },
         {},
-        {}
+        {},
       );
 
       if (empDataArr.length === 0) {
@@ -273,7 +273,7 @@ routes.get(
           LoginTime: { $gte: startDate, $lte: endDate },
         },
         {},
-        { LoginTime: 1 }
+        { LoginTime: 1 },
       );
 
       const attendance = attendanceData.map((a) => ({
@@ -293,9 +293,25 @@ routes.get(
           status: "approved",
         },
         {},
-        {}
+        {},
       );
-
+      const leaveSta = await Dbaccess.getdata(
+        "EmpLeave",
+        {
+          empId: empId,
+          fromDate: { $lte: endDate },
+          toDate: { $gte: startDate },
+        },
+        {},
+        {},
+      );
+      const leaveStatus = leaveSta.map((l) => ({
+        leaveType: l.leaveType,
+        from: l.fromDate.toISOString().split("T")[0],
+        to: l.toDate.toISOString().split("T")[0],
+        noOfDays: l.noOfDays,
+        status: l.status,
+      }));
       const leave = leaveData.map((l) => ({
         leaveType: l.leaveType,
         from: l.fromDate.toISOString().split("T")[0],
@@ -314,8 +330,21 @@ routes.get(
           status: "approved",
         },
         {},
-        {}
+        {},
       );
+      const permSta = await Dbaccess.getdata(
+        "EmpPermission",
+        { empId: empId, date: { $gte: startDate, $lte: endDate } },
+        {},
+        {},
+      );
+      const permStatus = permSta.map((p) => ({
+        date: p.date.toISOString().split("T")[0],
+        fromTime: p.fromTime,
+        toTime: p.toTime,
+        permHours: p.permHours,
+        status: p.status,
+      }));
 
       const permission = permissionData.map((p) => ({
         date: p.date.toISOString().split("T")[0],
@@ -349,13 +378,15 @@ routes.get(
         },
         attendance,
         leave,
+        leaveStatus,
         permission,
+        permStatus,
       });
     } catch (error) {
       console.error(error);
       res.status(500).json({ status: 500, message: "Internal Server Error" });
     }
-  }
+  },
 );
 
 module.exports = routes;
