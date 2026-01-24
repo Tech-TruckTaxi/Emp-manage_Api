@@ -21,7 +21,7 @@ routes.post("/addleaveAction", Dbaccess.authenticateToken, async (req, res) => {
       "EmpLeave",
       { leaveId: Number(leaveId) },
       {},
-      {}
+      {},
     );
 
     if (leaveArr.length === 0) {
@@ -37,7 +37,7 @@ routes.post("/addleaveAction", Dbaccess.authenticateToken, async (req, res) => {
     await Dbaccess.updateone(
       "EmpLeave",
       { status: updatedStatus, updatedAt: new Date() },
-      { leaveId: Number(leaveId) }
+      { leaveId: Number(leaveId) },
     );
 
     return res.status(200).json({
@@ -74,7 +74,7 @@ routes.post("/addpermAction", Dbaccess.authenticateToken, async (req, res) => {
       "EmpPermission",
       { permId: Number(permId) },
       {},
-      {}
+      {},
     );
 
     if (permArr.length === 0) {
@@ -90,7 +90,7 @@ routes.post("/addpermAction", Dbaccess.authenticateToken, async (req, res) => {
     await Dbaccess.updateone(
       "EmpPermission",
       { status: updatedStatus, updatedAt: new Date() },
-      { permId: Number(permId) }
+      { permId: Number(permId) },
     );
 
     if (permArr.length === 0) {
@@ -222,18 +222,18 @@ routes.get(
 
       const employeesReport = employees.map((emp) => {
         const present = attendanceData.filter(
-          (a) => a.empId === emp.LoginID && a.isPresent
+          (a) => a.empId === emp.LoginID && a.isPresent,
         ).length;
 
         const leave = leaveData.filter((l) => l.empId === emp.LoginID).length;
 
         const empPermissions = permissionData.filter(
-          (p) => p.empId === emp.LoginID
+          (p) => p.empId === emp.LoginID,
         );
 
         const totalPermHours = empPermissions.reduce(
           (sum, p) => sum + (p.permHours || 0),
-          0
+          0,
         );
 
         const totalPermDays = empPermissions.length;
@@ -265,7 +265,7 @@ routes.get(
         message: "Internal Server Error",
       });
     }
-  }
+  },
 );
 
 //Get Notifications
@@ -273,54 +273,163 @@ routes.get(
   "/getnotifications",
   Dbaccess.authenticateToken,
   async function (req, res) {
-      let tablename = "Ems_Notifications";
-      let find = { isRead: false };
-      let project = {};
-      let sort = { sentDate: -1 };
-      let result = await Dbaccess.getdata(tablename, find, project, sort);
-      if (result.length != 0) {
-        var ResponseData = [];
-        for (let index = 0; index < result.length; index++) {
-          var obj = result[index];
-          delete obj._id;
-          ResponseData.push(obj);
-        }
-        res.status(200).json({
-          status: 200,
-          message: "Records found",
-          data: ResponseData,
-        });
-      } else {
-        res.status(404).json({
-          status: 404,
-          message: "Records Not found",
-        });
+    let tablename = "Ems_Notifications";
+    let find = { isRead: false };
+    let project = {};
+    let sort = { sentDate: -1 };
+    let result = await Dbaccess.getdata(tablename, find, project, sort);
+    if (result.length != 0) {
+      var ResponseData = [];
+      for (let index = 0; index < result.length; index++) {
+        var obj = result[index];
+        delete obj._id;
+        ResponseData.push(obj);
       }
-  }
-);
-
-//Notifications Read
-routes.post("/notificationRead", Dbaccess.authenticateToken, async function (req, res) {
-  try {
-    const tablename = "Ems_Notifications";
-    const filter = { isRead: false};
-
-    const update = { isRead: true };
-    var upResult = await Dbaccess.updatemany(tablename, { isRead: true }, {isRead: false});
-
-    if (upResult) {
       res.status(200).json({
         status: 200,
-        message: "Notifications marked as read",
+        message: "Records found",
+        data: ResponseData,
       });
     } else {
       res.status(404).json({
         status: 404,
-        message: "No matching notifications found",
+        message: "Records Not found",
+      });
+    }
+  },
+);
+
+//Notifications Read
+routes.post(
+  "/notificationRead",
+  Dbaccess.authenticateToken,
+  async function (req, res) {
+    try {
+      const tablename = "Ems_Notifications";
+      const filter = { isRead: false };
+
+      const update = { isRead: true };
+      var upResult = await Dbaccess.updatemany(
+        tablename,
+        { isRead: true },
+        { isRead: false },
+      );
+
+      if (upResult) {
+        res.status(200).json({
+          status: 200,
+          message: "Notifications marked as read",
+        });
+      } else {
+        res.status(404).json({
+          status: 404,
+          message: "No matching notifications found",
+        });
+      }
+    } catch (error) {
+      console.error("Error in /notificationsread:", error);
+      res.status(500).json({
+        status: 500,
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  },
+);
+
+//Add User
+routes.post("/adduser", Dbaccess.authenticateToken, async function (req, res) {
+  try {
+    const params = {
+      name: req.body.name,
+      empId: req.body.empId,
+      email: req.body.email,
+      userName: req.body.userName,
+      password: req.body.password,
+      mobile: req.body.mobile,
+      empType: req.body.empType,
+    };
+    const reqDataValidateResp = await validation.ValidateRequestData(params);
+    if (reqDataValidateResp.respCode !== 2) {
+      return res.send(reqDataValidateResp);
+    }
+    const resultData = await Dbaccess.getdata("Emp_Login", {}, {}, { Id: -1 });
+    const Id = resultData.length > 0 ? resultData[0].Id + 1 : 1;
+
+    const insertData = {
+      Id: Id,
+      ...params,
+      alterMobile: req.body.alterMobile,
+      dob: req.body.dob,
+      address: req.body.address,
+      city: req.body.city,
+      joinDate: req.body.joinDate,
+      PFNumber: req.body.PFNumber,
+      insDetails: req.body.insDetails,
+      bankName: req.body.bankName,
+      accNumber: req.body.accNumber,
+      ifscCode: req.body.ifscCode,
+      branchName: req.body.branchName,
+      aadharName: req.body.aadharName,
+      AadharNo: req.body.AadharNo,
+      PANNo: req.body.PANNo,
+      qualification: req.body.qualification,
+      education: req.body.education,
+      skill: req.body.skill,
+      splTalent: req.body.splTalent,
+      createdAt: new Date(),
+      createdBy: req.body.createdBy,
+      status: "active",
+    };
+    const result = await Dbaccess.insertone("Emp_Login", insertData);
+
+    if (result) {
+      res.status(200).json({
+        status: 200,
+        message: "User added successfully",
+      });
+    } else {
+      res.status(404).json({
+        status: 404,
+        message: "Failed to add user",
       });
     }
   } catch (error) {
-    console.error("Error in /notificationsread:", error);
+    console.error("Error in /adduser:", error);
+    res.status(500).json({
+      status: 500,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+//get Users
+routes.get("/getusers", Dbaccess.authenticateToken, async function (req, res) {
+  try {
+    const result = await Dbaccess.getdata("Emp_Login", {}, {}, { Id: 1 });
+
+    if (result.length != 0) {
+      var ResponseData = [];
+      for (let index = 0; index < result.length; index++) {
+        var obj = result[index];
+        delete obj._id;
+        delete obj.password;
+        ResponseData.push(obj);
+      }
+      res.status(200).json({
+        status: 200,
+        message: "Records found",
+        data: ResponseData,
+      });
+    } else {
+      res.status(404).json({
+        status: 404,
+        message: "Records Not found",
+      });
+    }
+  } catch (error) {
+    console.error("Error in /getusers:", error);
     res.status(500).json({
       status: 500,
       message: "Internal Server Error",

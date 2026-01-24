@@ -18,8 +18,8 @@ routes.post("/login", async function (req, res) {
     }
 
     const result = await Dbaccess.getdata(
-      "login",
-      { UserName: params.username, Passwd: params.password },
+      "Emp_Login",
+      { userName: params.username, password: params.password },
       {},
       {}
     );
@@ -33,7 +33,7 @@ routes.post("/login", async function (req, res) {
 
     // JWT Token
     const token = jwt.sign(
-      { id: result[0].LoginID, role: result[0].role },
+      { id: result[0].empId, role: result[0].empType },
       config.secret,
       { expiresIn: "24h" }
     );
@@ -70,7 +70,7 @@ routes.post("/login", async function (req, res) {
 
       await Dbaccess.insertone("EmpAttendance", {
         attendID: attendID,
-        empId: result[0].LoginID,
+        empId: result[0].empId,
         EmployeeName: result[0].name,
         LoginTime: new Date(),
       });
@@ -79,9 +79,9 @@ routes.post("/login", async function (req, res) {
     res.status(200).json({
       status: 200,
       message: "Login Successfully",
-      employeeid: result[0].LoginID,
+      employeeid: result[0].empId,
       employeename: result[0].name,
-      roleid: result[0].role,
+      roleid: result[0].empType,
       token: token,
     });
   } catch (error) {
