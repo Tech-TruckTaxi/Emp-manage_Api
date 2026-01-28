@@ -135,7 +135,7 @@ routes.get("/getdailyreport", Dbaccess.authenticateToken, async (req, res) => {
       leaveRequests,
       permRequests,
     ] = await Promise.all([
-      Dbaccess.getdatacount("login", {}),
+      Dbaccess.getdatacount("Emp_Login", {}),
 
       Dbaccess.getdatacount("EmpAttendance", {
         LoginTime: { $gte: startOfDay, $lt: nextDay },
