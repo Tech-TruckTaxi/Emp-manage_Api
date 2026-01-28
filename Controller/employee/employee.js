@@ -251,8 +251,8 @@ routes.get(
 
       // Employee Info
       const empDataArr = await Dbaccess.getdata(
-        "login",
-        { LoginID: empId },
+        "Emp_Login",
+        { empId: empId },
         {},
         {},
       );
