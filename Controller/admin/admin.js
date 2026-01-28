@@ -203,7 +203,7 @@ routes.get(
         if (d.getDay() !== 0) workingDays++;
       }
 
-      const employees = await Dbaccess.getdata("login", {});
+      const employees = await Dbaccess.getdata("Emp_Login", {});
 
       const [attendanceData, leaveData, permissionData] = await Promise.all([
         Dbaccess.getdata("EmpAttendance", {
@@ -222,13 +222,13 @@ routes.get(
 
       const employeesReport = employees.map((emp) => {
         const present = attendanceData.filter(
-          (a) => a.empId === emp.LoginID && a.isPresent,
+          (a) => a.empId === emp.empId && a.isPresent,
         ).length;
 
-        const leave = leaveData.filter((l) => l.empId === emp.LoginID).length;
+        const leave = leaveData.filter((l) => l.empId === emp.empId).length;
 
         const empPermissions = permissionData.filter(
-          (p) => p.empId === emp.LoginID,
+          (p) => p.empId === emp.empId,
         );
 
         const totalPermHours = empPermissions.reduce(

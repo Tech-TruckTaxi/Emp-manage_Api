@@ -365,9 +365,9 @@ routes.get(
         status: 200,
         message: "Record Found",
         employee: {
-          empId: empData.LoginID,
+          empId: empData.empId,
           EmployeeName: empData.name,
-          role: empData.role,
+          role: empData.empType,
         },
         summary: {
           monthYear,

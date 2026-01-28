@@ -49,7 +49,7 @@ routes.post("/login", async function (req, res) {
     const logCheck = await Dbaccess.getdata(
       "EmpAttendance",
       {
-        empId: result[0].LoginID,
+        empId: result[0].empId,
         LoginTime: { $gte: startOfDay, $lte: endOfDay },
       },
       {},
@@ -114,15 +114,15 @@ routes.post("/logout", Dbaccess.authenticateToken, async function (req, res) {
     const logs = await Dbaccess.getdata(
       "EmpAttendance",
       {
-        LoginID: params.empId,
-        LogTime: { $gte: startOfDay, $lte: endOfDay },
+        empId: params.empId,
+        LoginTime: { $gte: startOfDay, $lte: endOfDay },
       },
       {},
       {}
     );
 
     if (logs.length > 0 && !logs[0].LogoutTime) {
-      const loginTime = new Date(logs[0].LogTime);
+      const loginTime = new Date(logs[0].LoginTime);
       const logoutTime = new Date();
 
       // Calculate hours (decimal)
