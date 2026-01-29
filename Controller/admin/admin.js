@@ -8,6 +8,8 @@ routes.post("/addleaveAction", Dbaccess.authenticateToken, async (req, res) => {
     const params = {
       leaveId: req.body.leaveId,
       action: req.body.action,
+      empId: req.body.empId,
+      updatedBy: req.body.updatedBy,
     };
     const leaveId = params.leaveId;
     const action = params.action;
@@ -36,10 +38,22 @@ routes.post("/addleaveAction", Dbaccess.authenticateToken, async (req, res) => {
 
     await Dbaccess.updateone(
       "EmpLeave",
-      { status: updatedStatus, updatedAt: new Date() },
+      {
+        status: updatedStatus,
+        updatedAt: new Date(),
+        updatedBy: params.updatedBy,
+      },
       { leaveId: Number(leaveId) },
     );
-
+    const fromDate = new Date(leaveArr[0].fromDate).toLocaleDateString('en-GB');
+    const toDate = new Date(leaveArr[0].toDate).toLocaleDateString('en-GB');
+    await Dbaccess.insertone("Ems_Notifications", {
+      empId: params.empId,
+      message: `Leave ${updatedStatus} from ${fromDate} to ${toDate} by ${params.updatedBy}`,
+      type: "Leave Action",
+      sentDate: new Date(),
+      isRead: false,
+    });
     return res.status(200).json({
       status: 200,
       message:
@@ -62,9 +76,12 @@ routes.post("/addpermAction", Dbaccess.authenticateToken, async (req, res) => {
     const params = {
       permId: req.body.permId,
       action: req.body.action,
+      empId: req.body.empId,
+      updatedBy: req.body.updatedBy,
     };
     const permId = params.permId;
     const action = params.action;
+
     const reqDataValidateResp = await validation.ValidateRequestData(params);
     if (reqDataValidateResp.respCode !== 2) {
       return res.send(reqDataValidateResp);
@@ -99,6 +116,13 @@ routes.post("/addpermAction", Dbaccess.authenticateToken, async (req, res) => {
         message: "Permission request not found",
       });
     }
+    await Dbaccess.insertone("Ems_Notifications", {
+      empId: params.empId,
+      message: `Permission ${updatedStatus} for ${permArr[0].date} from ${permArr[0].fromTime} to ${permArr[0].toTime} by ${params.updatedBy}`,
+      type: "Permission Action",
+      sentDate: new Date(),
+      isRead: false,
+    });
 
     return res.status(200).json({
       status: 200,
@@ -119,14 +143,12 @@ routes.post("/addpermAction", Dbaccess.authenticateToken, async (req, res) => {
 // Daily Report
 routes.get("/getdailyreport", Dbaccess.authenticateToken, async (req, res) => {
   try {
-    // Date range (once)
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
     const nextDay = new Date(startOfDay);
     nextDay.setDate(startOfDay.getDate() + 1);
 
-    // Run ALL independent queries in parallel
     const [
       totalEmployees,
       presentToday,
@@ -193,14 +215,13 @@ routes.get(
       const startOfMonth = new Date(year, month - 1, 1);
       const endOfMonth = new Date(year, month, 0, 23, 59, 59);
 
-      // Working days (excluding Sundays)
       let workingDays = 0;
       for (
         let d = new Date(startOfMonth);
         d <= endOfMonth;
         d.setDate(d.getDate() + 1)
       ) {
-        if (d.getDay() !== 0) workingDays++;
+        workingDays++;
       }
 
       const employees = await Dbaccess.getdata("Emp_Login", {});
@@ -274,7 +295,7 @@ routes.get(
   Dbaccess.authenticateToken,
   async function (req, res) {
     let tablename = "Ems_Notifications";
-    let find = { isRead: false };
+    let find = { isRead: false, type: { $in: ["Permission Request ", "Leave Request "] } };
     let project = {};
     let sort = { sentDate: -1 };
     let result = await Dbaccess.getdata(tablename, find, project, sort);
@@ -306,13 +327,13 @@ routes.post(
   async function (req, res) {
     try {
       const tablename = "Ems_Notifications";
-      const filter = { isRead: false };
+      const filter = { isRead: false, type: { $in: ["Permission Request ", "Leave Request "] } };
 
       const update = { isRead: true };
       var upResult = await Dbaccess.updatemany(
         tablename,
-        { isRead: true },
-        { isRead: false },
+        update,
+        filter
       );
 
       if (upResult) {

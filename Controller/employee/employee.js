@@ -389,4 +389,82 @@ routes.get(
   },
 );
 
+//Get Employee Notifications
+routes.get(
+  "/getEmpNotifications",
+  Dbaccess.authenticateToken,
+  async function (req, res) {
+    const empId = req.query.empId;
+     const reqDataValidateResp = await validation.ValidateRequestData({ empId });
+     if (reqDataValidateResp.respCode !== 2) {
+       return res.send(reqDataValidateResp);
+     }
+    let tablename = "Ems_Notifications";
+    let find = { isRead: false, type: { $in: ["Permission Action", "Leave Action"] } , empId: empId};
+    let project = {};
+    let sort = { sentDate: -1 };
+    let result = await Dbaccess.getdata(tablename, find, project, sort);
+    if (result.length != 0) {
+      var ResponseData = [];
+      for (let index = 0; index < result.length; index++) {
+        var obj = result[index];
+        delete obj._id;
+        ResponseData.push(obj);
+      }
+      res.status(200).json({
+        status: 200,
+        message: "Records found",
+        data: ResponseData,
+      });
+    } else {
+      res.status(404).json({
+        status: 404,
+        message: "Records Not found",
+      });
+    }
+  },
+);
+
+//Employee Notifications Read
+routes.post(
+  "/empNotificationRead",
+  Dbaccess.authenticateToken,
+  async function (req, res) {
+    try {
+      const empId = req.body.empId;
+     const reqDataValidateResp = await validation.ValidateRequestData({ empId });
+     if (reqDataValidateResp.respCode !== 2) {
+       return res.send(reqDataValidateResp);
+     }
+      const tablename = "Ems_Notifications";
+      const filter = { isRead: false, type: { $in: ["Permission Action", "Leave Action"] } , empId: empId};
+
+      const update = { isRead: true };
+      var upResult = await Dbaccess.updatemany(
+        tablename,
+        update,
+        filter
+      );
+
+      if (upResult) {
+        res.status(200).json({
+          status: 200,
+          message: "Notifications marked as read",
+        });
+      } else {
+        res.status(404).json({
+          status: 404,
+          message: "No matching notifications found",
+        });
+      }
+    } catch (error) {
+      console.error("Error in /notificationsread:", error);
+      res.status(500).json({
+        status: 500,
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  },
+);
 module.exports = routes;
