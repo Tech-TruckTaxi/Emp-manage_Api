@@ -357,7 +357,7 @@ routes.get(
       let d = new Date(startDate);
       while (d <= endDate) {
         const day = d.getDay();
-        if (day !== 0 && day !== 7) totalWorkingDays++;
+       totalWorkingDays++;
         d.setDate(d.getDate() + 1);
       }
 
