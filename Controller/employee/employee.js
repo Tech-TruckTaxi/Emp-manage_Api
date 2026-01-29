@@ -229,161 +229,169 @@ routes.get(
   Dbaccess.authenticateToken,
   async function (req, res) {
     try {
-      const params = {
-        empId: req.query.empId,
-        monthYear: req.query.monthYear, // yyyy-mm
-      };
-      const empId = params.empId;
-      const monthYear = params.monthYear;
+      const { empId, monthYear } = req.query;
 
-      const reqDataValidateResp = await validation.ValidateRequestData(params);
+      const reqDataValidateResp = await validation.ValidateRequestData({
+        empId,
+        monthYear,
+      });
       if (reqDataValidateResp.respCode !== 2) {
         return res.send(reqDataValidateResp);
       }
 
-      // Split yyyy-mm
       // @ts-ignore
       const [year, month] = monthYear.split("-");
-
-      // Month start & end
-      const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+      const startDate = new Date(Date.UTC(year, month - 1, 1));
       const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
 
-      // Employee Info
-      const empDataArr = await Dbaccess.getdata(
-        "Emp_Login",
-        { empId: empId },
-        {},
-        {},
-      );
+      const dateOnly = (d) => d.toISOString().split("T")[0];
 
-      if (empDataArr.length === 0) {
+      /** ---------------- EMPLOYEE ---------------- */
+      const empArr = await Dbaccess.getdata("Emp_Login", { empId }, {}, {});
+
+      if (!empArr.length) {
         return res
           .status(404)
           .json({ status: 404, message: "Employee not found" });
       }
 
-      const empData = empDataArr[0];
+      const empData = empArr[0];
 
-      // Attendance
+      const attendanceMap = {};
+
+      /** ---------------- ATTENDANCE ---------------- */
       const attendanceData = await Dbaccess.getdata(
         "EmpAttendance",
         {
-          empId: empId,
+          empId,
           LoginTime: { $gte: startDate, $lte: endDate },
+          isPresent: true,
         },
         {},
-        { LoginTime: 1 },
+        {},
       );
 
-      const attendance = attendanceData.map((a) => ({
-        date: a.LoginTime.toISOString().split("T")[0],
-        isPresent: !!a.isPresent,
-      }));
+      attendanceData.forEach((a) => {
+        const d = dateOnly(a.LoginTime);
+        attendanceMap[d] = attendanceMap[d] || {
+          date: d,
+          isPresent: false,
+          leave: null,
+          permission: null,
+          attendStatus: "Absent",
+        };
+        attendanceMap[d].isPresent = true;
+      });
 
-      const totalPresent = attendance.filter((a) => a.isPresent).length;
-
-      // Leave
+      /** ---------------- LEAVE ---------------- */
       const leaveData = await Dbaccess.getdata(
         "EmpLeave",
         {
-          empId: empId,
-          fromDate: { $lte: endDate },
-          toDate: { $gte: startDate },
-          status: "approved",
-        },
-        {},
-        {},
-      );
-      const leaveSta = await Dbaccess.getdata(
-        "EmpLeave",
-        {
-          empId: empId,
+          empId,
           fromDate: { $lte: endDate },
           toDate: { $gte: startDate },
         },
         {},
         {},
       );
-      const leaveStatus = leaveSta.map((l) => ({
-        leaveType: l.leaveType,
-        from: l.fromDate.toISOString().split("T")[0],
-        to: l.toDate.toISOString().split("T")[0],
-        noOfDays: l.noOfDays,
-        status: l.status,
-      }));
-      const leave = leaveData.map((l) => ({
-        leaveType: l.leaveType,
-        from: l.fromDate.toISOString().split("T")[0],
-        to: l.toDate.toISOString().split("T")[0],
-        noOfDays: l.noOfDays,
-      }));
 
-      const totalLeave = leave.reduce((sum, l) => sum + l.noOfDays, 0);
+      leaveData.forEach((leave) => {
+        let cur = new Date(leave.fromDate);
+        const leaveEnd = new Date(leave.toDate);
 
-      // Permission
+        cur.setUTCHours(0, 0, 0, 0);
+        leaveEnd.setUTCHours(0, 0, 0, 0);
+
+        while (cur <= leaveEnd) {
+          const d = dateOnly(cur);
+
+          attendanceMap[d] = attendanceMap[d] || {
+            date: d,
+            isPresent: false,
+            leave: null,
+            permission: null,
+            attendStatus: "Absent",
+          };
+
+          attendanceMap[d].leave = {
+            leaveType: leave.leaveType,
+            status: leave.status,
+          };
+
+          cur.setDate(cur.getDate() + 1);
+        }
+      });
+
+      /** ---------------- PERMISSION ---------------- */
       const permissionData = await Dbaccess.getdata(
         "EmpPermission",
         {
-          empId: empId,
+          empId,
           date: { $gte: startDate, $lte: endDate },
-          status: "approved",
         },
         {},
         {},
       );
-      const permSta = await Dbaccess.getdata(
-        "EmpPermission",
-        { empId: empId, date: { $gte: startDate, $lte: endDate } },
-        {},
-        {},
+
+      permissionData.forEach((p) => {
+        const d = dateOnly(p.date);
+
+        attendanceMap[d] = attendanceMap[d] || {
+          date: d,
+          isPresent: false,
+          leave: null,
+          permission: null,
+        };
+
+        attendanceMap[d].permission = {
+          fromTime: p.fromTime,
+          toTime: p.toTime,
+          hours: p.permHours,
+          status: p.status,
+        };
+      });
+
+      const attendance = Object.values(attendanceMap).sort(
+        // @ts-ignore
+        (a, b) => new Date(a.date) - new Date(b.date),
       );
-      const permStatus = permSta.map((p) => ({
-        date: p.date.toISOString().split("T")[0],
-        fromTime: p.fromTime,
-        toTime: p.toTime,
-        permHours: p.permHours,
-        status: p.status,
-      }));
 
-      const permission = permissionData.map((p) => ({
-        date: p.date.toISOString().split("T")[0],
-        hours: p.permHours,
-      }));
-      const totalPermHours = permission.reduce((sum, p) => sum + p.hours, 0);
-
-      // Total Working Days (Mon–Sat)
-      let totalWorkingDays = 0;
-      let d = new Date(startDate);
-      while (d <= endDate) {
-        const day = d.getDay();
-       totalWorkingDays++;
-        d.setDate(d.getDate() + 1);
-      }
-
+      /** ---------------- SUMMARY ---------------- */
+      const totalPresent = attendance.filter((a) => a.isPresent).length;
+      const totalLeave = attendance.filter(
+        (a) => a.leave && a.leave.status === "approved",
+      ).length;
+      const totalPermHours = attendance.reduce(
+        (sum, a) => sum + (a.permission?.hours || 0),
+        0,
+      );
+      Object.values(attendanceMap).forEach((day) => {
+        if (day.leave && day.leave.status === "approved") {
+          day.attendStatus = "Leave";
+        } else if (day.isPresent) {
+          day.attendStatus = "Present";
+        } else {
+          day.attendStatus = "Absent";
+        }
+      });
       res.status(200).json({
         status: 200,
         message: "Record Found",
         employee: {
           empId: empData.empId,
-          EmployeeName: empData.name,
+          employeeName: empData.name,
           role: empData.empType,
         },
         summary: {
           monthYear,
-          totalWorkingDays,
           totalPresent,
           totalLeave,
           totalPermHours,
         },
         attendance,
-        leave,
-        leaveStatus,
-        permission,
-        permStatus,
       });
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ status: 500, message: "Internal Server Error" });
     }
   },
@@ -395,12 +403,16 @@ routes.get(
   Dbaccess.authenticateToken,
   async function (req, res) {
     const empId = req.query.empId;
-     const reqDataValidateResp = await validation.ValidateRequestData({ empId });
-     if (reqDataValidateResp.respCode !== 2) {
-       return res.send(reqDataValidateResp);
-     }
+    const reqDataValidateResp = await validation.ValidateRequestData({ empId });
+    if (reqDataValidateResp.respCode !== 2) {
+      return res.send(reqDataValidateResp);
+    }
     let tablename = "Ems_Notifications";
-    let find = { isRead: false, type: { $in: ["Permission Action", "Leave Action"] } , empId: empId};
+    let find = {
+      isRead: false,
+      type: { $in: ["Permission Action", "Leave Action"] },
+      empId: empId,
+    };
     let project = {};
     let sort = { sentDate: -1 };
     let result = await Dbaccess.getdata(tablename, find, project, sort);
@@ -432,19 +444,21 @@ routes.post(
   async function (req, res) {
     try {
       const empId = req.body.empId;
-     const reqDataValidateResp = await validation.ValidateRequestData({ empId });
-     if (reqDataValidateResp.respCode !== 2) {
-       return res.send(reqDataValidateResp);
-     }
+      const reqDataValidateResp = await validation.ValidateRequestData({
+        empId,
+      });
+      if (reqDataValidateResp.respCode !== 2) {
+        return res.send(reqDataValidateResp);
+      }
       const tablename = "Ems_Notifications";
-      const filter = { isRead: false, type: { $in: ["Permission Action", "Leave Action"] } , empId: empId};
+      const filter = {
+        isRead: false,
+        type: { $in: ["Permission Action", "Leave Action"] },
+        empId: empId,
+      };
 
       const update = { isRead: true };
-      var upResult = await Dbaccess.updatemany(
-        tablename,
-        update,
-        filter
-      );
+      var upResult = await Dbaccess.updatemany(tablename, update, filter);
 
       if (upResult) {
         res.status(200).json({
