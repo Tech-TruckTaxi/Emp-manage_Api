@@ -435,7 +435,6 @@ routes.get("/getusers", Dbaccess.authenticateToken, async function (req, res) {
       for (let index = 0; index < result.length; index++) {
         var obj = result[index];
         delete obj._id;
-        delete obj.password;
         ResponseData.push(obj);
       }
       res.status(200).json({
