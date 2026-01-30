@@ -369,6 +369,7 @@ routes.post("/adduser", Dbaccess.authenticateToken, async function (req, res) {
       password: req.body.password,
       mobile: req.body.mobile,
       empType: req.body.empType,
+      createdBy: req.body.createdBy,
     };
     const reqDataValidateResp = await validation.ValidateRequestData(params);
     if (reqDataValidateResp.respCode !== 2) {
@@ -399,7 +400,6 @@ routes.post("/adduser", Dbaccess.authenticateToken, async function (req, res) {
       skill: req.body.skill,
       splTalent: req.body.splTalent,
       createdAt: new Date(),
-      createdBy: req.body.createdBy,
       status: "active",
     };
     const result = await Dbaccess.insertone("Emp_Login", insertData);
@@ -428,7 +428,7 @@ routes.post("/adduser", Dbaccess.authenticateToken, async function (req, res) {
 //get Users
 routes.get("/getusers", Dbaccess.authenticateToken, async function (req, res) {
   try {
-    const result = await Dbaccess.getdata("Emp_Login", {}, {}, { Id: 1 });
+    const result = await Dbaccess.getdata("Emp_Login",{status: "active"},{} , { Id: 1 });
 
     if (result.length != 0) {
       var ResponseData = [];
@@ -458,4 +458,105 @@ routes.get("/getusers", Dbaccess.authenticateToken, async function (req, res) {
   }
 });
 
+//Edit User
+routes.post("/edituser", Dbaccess.authenticateToken, async function (req, res) {
+  try {
+    const params = {
+      Id: req.body.Id,
+      name: req.body.name,
+      empId: req.body.empId,
+      email: req.body.email,
+      userName: req.body.userName,
+      password: req.body.password,
+      mobile: req.body.mobile,
+      empType: req.body.empType,
+      updatedBy: req.body.updatedBy,
+    };
+    const reqDataValidateResp = await validation.ValidateRequestData(params);
+    if (reqDataValidateResp.respCode !== 2) {
+      return res.send(reqDataValidateResp);
+    }
+
+    const updateData = { 
+      ...params, 
+      alterMobile: req.body.alterMobile,
+      dob: req.body.dob,
+      address: req.body.address,
+      city: req.body.city,
+      joinDate: req.body.joinDate,
+      PFNumber: req.body.PFNumber,
+      insDetails: req.body.insDetails,
+      bankName: req.body.bankName,
+      accNumber: req.body.accNumber,
+      ifscCode: req.body.ifscCode,
+      branchName: req.body.branchName,
+      aadharName: req.body.aadharName,
+      AadharNo: req.body.AadharNo,
+      PANNo: req.body.PANNo,
+      qualification: req.body.qualification,
+      education: req.body.education,
+      skill: req.body.skill,
+      splTalent: req.body.splTalent,
+      updatedAt: new Date() 
+    };
+
+    delete updateData.Id;
+
+    const result = await Dbaccess.updateone("Emp_Login", updateData, { Id: Number(params.Id) });
+
+    if (result) {
+      res.status(200).json({
+        status: 200,
+        message: "User updated successfully",
+      });
+    } else {
+      res.status(404).json({
+        status: 404,
+        message: "Failed to update user",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: 500,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
+//Block User
+routes.post("/blockuser", Dbaccess.authenticateToken, async function (req, res) {
+  try {
+    const params = {
+      Id: req.body.Id,
+      blockedBy: req.body.blockedBy,
+    };
+    const reqDataValidateResp = await validation.ValidateRequestData(params);
+    if (reqDataValidateResp.respCode !== 2) {
+      return res.send(reqDataValidateResp);
+    }
+
+    const updateData = { status: "Inactive", blockedAt: new Date() , blockedBy: params.blockedBy };
+
+    const result = await Dbaccess.updateone("Emp_Login", updateData, { Id: Number(params.Id) });
+
+    if (result) {
+      res.status(200).json({
+        status: 200,
+        message: "User blocked successfully",
+      });
+    } else {
+      res.status(404).json({
+        status: 404,
+        message: "Failed to block user",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: 500,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
 module.exports = routes;

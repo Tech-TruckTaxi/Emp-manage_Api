@@ -30,7 +30,12 @@ routes.post("/login", async function (req, res) {
         message: "Username or Password is incorrect!",
       });
     }
-
+if(result[0].status === "Inactive"){
+    return res.status(404).json({
+      status: 404,
+      message: "User is blocked!",
+    });
+  }
     // JWT Token
     const token = jwt.sign(
       { id: result[0].empId, role: result[0].empType },
