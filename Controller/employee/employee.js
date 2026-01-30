@@ -374,6 +374,15 @@ routes.get(
           day.attendStatus = "Absent";
         }
       });
+
+       let workingDays = 0;
+      for (
+        let d = new Date(startDate);
+        d <= endDate;
+        d.setDate(d.getDate() + 1)
+      ) {
+        workingDays++;
+      }
       res.status(200).json({
         status: 200,
         message: "Record Found",
@@ -387,6 +396,7 @@ routes.get(
           totalPresent,
           totalLeave,
           totalPermHours,
+          workingDays,
         },
         attendance,
       });
