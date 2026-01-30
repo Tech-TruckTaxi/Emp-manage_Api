@@ -396,7 +396,7 @@ routes.get(
           totalPresent,
           totalLeave,
           totalPermHours,
-          workingDays,
+          totalWorkingDays:workingDays,
         },
         attendance,
       });
