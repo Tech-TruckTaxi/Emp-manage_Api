@@ -1,8 +1,8 @@
 const routes = require("express").Router();
-var jwt = require("jsonwebtoken");
-var config = require("../../config");
-var validation = require("../validation");
-var Dbaccess = require("../../Model/dbaccess");
+const jwt = require("jsonwebtoken");
+const config = require("../../config");
+const validation = require("../validation");
+const Dbaccess = require("../../Model/dbaccess");
 
 // Login
 routes.post("/login", async function (req, res) {
@@ -18,8 +18,8 @@ routes.post("/login", async function (req, res) {
     }
 
     const result = await Dbaccess.getdata(
-      "login",
-      { UserName: params.username, Passwd: params.password },
+      "Emp_Login",
+      { userName: params.username, password: params.password },
       {},
       {}
     );
@@ -30,10 +30,15 @@ routes.post("/login", async function (req, res) {
         message: "Username or Password is incorrect!",
       });
     }
-
+if(result[0].status === "Inactive"){
+    return res.status(404).json({
+      status: 404,
+      message: "User is blocked!",
+    });
+  }
     // JWT Token
     const token = jwt.sign(
-      { id: result[0].LoginID, role: result[0].role },
+      { id: result[0].empId, role: result[0].empType },
       config.secret,
       { expiresIn: "24h" }
     );
@@ -49,7 +54,7 @@ routes.post("/login", async function (req, res) {
     const logCheck = await Dbaccess.getdata(
       "EmpAttendance",
       {
-        EmpId: result[0].LoginID,
+        empId: result[0].empId,
         LoginTime: { $gte: startOfDay, $lte: endOfDay },
       },
       {},
@@ -66,24 +71,22 @@ routes.post("/login", async function (req, res) {
         { attendID: -1 }
       );
 
-      const attendID =
-        lastRecord.length > 0 ? lastRecord[0].attendID + 1 : 1;
+      const attendID = lastRecord.length > 0 ? lastRecord[0].attendID + 1 : 1;
 
       await Dbaccess.insertone("EmpAttendance", {
         attendID: attendID,
-        EmpId: result[0].LoginID,
+        empId: result[0].empId,
         EmployeeName: result[0].name,
         LoginTime: new Date(),
-        LogIP: req.connection.remoteAddress,
       });
     }
 
     res.status(200).json({
       status: 200,
       message: "Login Successfully",
-      employeeid: result[0].LoginID,
+      employeeid: result[0].empId,
       employeename: result[0].name,
-      roleid: result[0].role,
+      roleid: result[0].empType,
       token: token,
     });
   } catch (error) {
@@ -94,8 +97,6 @@ routes.post("/login", async function (req, res) {
     });
   }
 });
-
-
 
 // Logout
 routes.post("/logout", Dbaccess.authenticateToken, async function (req, res) {
@@ -118,15 +119,15 @@ routes.post("/logout", Dbaccess.authenticateToken, async function (req, res) {
     const logs = await Dbaccess.getdata(
       "EmpAttendance",
       {
-        LoginID: params.empId,
-        LogTime: { $gte: startOfDay, $lte: endOfDay },
+        empId: params.empId,
+        LoginTime: { $gte: startOfDay, $lte: endOfDay },
       },
       {},
       {}
     );
 
     if (logs.length > 0 && !logs[0].LogoutTime) {
-      const loginTime = new Date(logs[0].LogTime);
+      const loginTime = new Date(logs[0].LoginTime);
       const logoutTime = new Date();
 
       // Calculate hours (decimal)
