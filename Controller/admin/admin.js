@@ -45,12 +45,13 @@ routes.post("/addleaveAction", Dbaccess.authenticateToken, async (req, res) => {
       },
       { leaveId: Number(leaveId) },
     );
-    const fromDate = new Date(leaveArr[0].fromDate).toLocaleDateString('en-GB');
-    const toDate = new Date(leaveArr[0].toDate).toLocaleDateString('en-GB');
+    const fromDate = new Date(leaveArr[0].fromDate).toLocaleDateString("en-GB");
+    const toDate = new Date(leaveArr[0].toDate).toLocaleDateString("en-GB");
     await Dbaccess.insertone("Ems_Notifications", {
       empId: params.empId,
-      message: `Leave ${updatedStatus} from ${fromDate} to ${toDate} by ${params.updatedBy}`,
+      message: `Leave ${updatedStatus}`,
       type: "Leave Action",
+      updatedBy: params.updatedBy,
       sentDate: new Date(),
       isRead: false,
     });
@@ -118,8 +119,9 @@ routes.post("/addpermAction", Dbaccess.authenticateToken, async (req, res) => {
     }
     await Dbaccess.insertone("Ems_Notifications", {
       empId: params.empId,
-      message: `Permission ${updatedStatus} for ${permArr[0].date} from ${permArr[0].fromTime} to ${permArr[0].toTime} by ${params.updatedBy}`,
+      message: `Permission ${updatedStatus}`,
       type: "Permission Action",
+      updatedBy: params.updatedBy,
       sentDate: new Date(),
       isRead: false,
     });
@@ -295,7 +297,10 @@ routes.get(
   Dbaccess.authenticateToken,
   async function (req, res) {
     let tablename = "Ems_Notifications";
-    let find = { isRead: false, type: { $in: ["Permission Request ", "Leave Request "] } };
+    let find = {
+      isRead: false,
+      type: { $in: ["Permission Request ", "Leave Request "] },
+    };
     let project = {};
     let sort = { sentDate: -1 };
     let result = await Dbaccess.getdata(tablename, find, project, sort);
@@ -327,14 +332,13 @@ routes.post(
   async function (req, res) {
     try {
       const tablename = "Ems_Notifications";
-      const filter = { isRead: false, type: { $in: ["Permission Request ", "Leave Request "] } };
+      const filter = {
+        isRead: false,
+        type: { $in: ["Permission Request ", "Leave Request "] },
+      };
 
       const update = { isRead: true };
-      var upResult = await Dbaccess.updatemany(
-        tablename,
-        update,
-        filter
-      );
+      var upResult = await Dbaccess.updatemany(tablename, update, filter);
 
       if (upResult) {
         res.status(200).json({
@@ -428,7 +432,12 @@ routes.post("/adduser", Dbaccess.authenticateToken, async function (req, res) {
 //get Users
 routes.get("/getusers", Dbaccess.authenticateToken, async function (req, res) {
   try {
-    const result = await Dbaccess.getdata("Emp_Login",{status: "active"},{} , { Id: 1 });
+    const result = await Dbaccess.getdata(
+      "Emp_Login",
+      { status: "active" },
+      {},
+      { Id: 1 },
+    );
 
     if (result.length != 0) {
       var ResponseData = [];
@@ -477,8 +486,8 @@ routes.post("/edituser", Dbaccess.authenticateToken, async function (req, res) {
       return res.send(reqDataValidateResp);
     }
 
-    const updateData = { 
-      ...params, 
+    const updateData = {
+      ...params,
       alterMobile: req.body.alterMobile,
       dob: req.body.dob,
       address: req.body.address,
@@ -497,12 +506,14 @@ routes.post("/edituser", Dbaccess.authenticateToken, async function (req, res) {
       education: req.body.education,
       skill: req.body.skill,
       splTalent: req.body.splTalent,
-      updatedAt: new Date() 
+      updatedAt: new Date(),
     };
 
     delete updateData.Id;
 
-    const result = await Dbaccess.updateone("Emp_Login", updateData, { Id: Number(params.Id) });
+    const result = await Dbaccess.updateone("Emp_Login", updateData, {
+      Id: Number(params.Id),
+    });
 
     if (result) {
       res.status(200).json({
@@ -525,38 +536,48 @@ routes.post("/edituser", Dbaccess.authenticateToken, async function (req, res) {
 });
 
 //Block User
-routes.post("/blockuser", Dbaccess.authenticateToken, async function (req, res) {
-  try {
-    const params = {
-      Id: req.body.Id,
-      blockedBy: req.body.blockedBy,
-    };
-    const reqDataValidateResp = await validation.ValidateRequestData(params);
-    if (reqDataValidateResp.respCode !== 2) {
-      return res.send(reqDataValidateResp);
-    }
+routes.post(
+  "/blockuser",
+  Dbaccess.authenticateToken,
+  async function (req, res) {
+    try {
+      const params = {
+        Id: req.body.Id,
+        blockedBy: req.body.blockedBy,
+      };
+      const reqDataValidateResp = await validation.ValidateRequestData(params);
+      if (reqDataValidateResp.respCode !== 2) {
+        return res.send(reqDataValidateResp);
+      }
 
-    const updateData = { status: "Inactive", blockedAt: new Date() , blockedBy: params.blockedBy };
+      const updateData = {
+        status: "Inactive",
+        blockedAt: new Date(),
+        blockedBy: params.blockedBy,
+      };
 
-    const result = await Dbaccess.updateone("Emp_Login", updateData, { Id: Number(params.Id) });
-
-    if (result) {
-      res.status(200).json({
-        status: 200,
-        message: "User blocked successfully",
+      const result = await Dbaccess.updateone("Emp_Login", updateData, {
+        Id: Number(params.Id),
       });
-    } else {
-      res.status(404).json({
-        status: 404,
-        message: "Failed to block user",
+
+      if (result) {
+        res.status(200).json({
+          status: 200,
+          message: "User blocked successfully",
+        });
+      } else {
+        res.status(404).json({
+          status: 404,
+          message: "Failed to block user",
+        });
+      }
+    } catch (error) {
+      res.status(500).json({
+        status: 500,
+        message: "Internal Server Error",
+        error: error.message,
       });
     }
-  } catch (error) {
-    res.status(500).json({
-      status: 500,
-      message: "Internal Server Error",
-      error: error.message,
-    });
-  }
-});
+  },
+);
 module.exports = routes;

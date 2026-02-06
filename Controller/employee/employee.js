@@ -375,7 +375,7 @@ routes.get(
         }
       });
 
-       let workingDays = 0;
+      let workingDays = 0;
       for (
         let d = new Date(startDate);
         d <= endDate;
@@ -396,7 +396,7 @@ routes.get(
           totalPresent,
           totalLeave,
           totalPermHours,
-          totalWorkingDays:workingDays,
+          totalWorkingDays: workingDays,
         },
         attendance,
       });
