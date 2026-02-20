@@ -73,9 +73,9 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
       fromDate: req.body.fromDate,
       toDate: req.body.toDate,
       reason: req.body.reason,
-      isHalfDay: req.body.isHalfDay || false,
-      fromTime: req.body.fromTime || null,
-      toTime: req.body.toTime || null,
+      //isHalfDay: req.body.isHalfDay || false,
+      //fromTime: req.body.fromTime || null,
+     // toTime: req.body.toTime || null,
     };
 
     const reqDataValidateResp = await validation.ValidateRequestData(params);
@@ -97,7 +97,7 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
     // Calculate number of leave days (inclusive)
     fromDate.setHours(0, 0, 0, 0);
     toDate.setHours(0, 0, 0, 0);
-    if (params.isHalfDay) {
+   /*  if (params.isHalfDay) {
       const fromTime = params.fromTime;
       const toTime = params.toTime;
       if (!fromTime || !toTime) {
@@ -111,11 +111,11 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
       // @ts-ignore
       const diffMs = toDateTime - fromDateTime;
       var noOfDays = diffMs / (1000 * 60 * 60 * 24);
-    } else {
+    } else { */
       // @ts-ignore
       const diffTime = toDate - fromDate;
       var noOfDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    }
+    //}
     // Generate leaveId
     const lastLeave = await Dbaccess.getdata(
       "EmpLeave",
@@ -134,9 +134,9 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
       leaveType: params.leaveType,
       fromDate: new Date(params.fromDate),
       toDate: new Date(params.toDate),
-      isHalfDay: params.isHalfDay,
-      fromTime: params.fromTime,
-      toTime: params.toTime,
+      //isHalfDay: params.isHalfDay,
+      //fromTime: params.fromTime,
+      //toTime: params.toTime,
       reason: params.reason,
       noOfDays: noOfDays,
       leaveReqTime: new Date(),
@@ -410,6 +410,21 @@ routes.get(
       ) {
         workingDays++;
       }
+      let find = {
+      isRead: false,
+      type: { $in: ["Permission Action", "Leave Action"] },
+      empId: empId,
+    };
+    let permCount = await Dbaccess.getdatacount("Ems_Notifications", {
+      isRead: false,
+      type: "Permission Action",
+      empId: empId,
+    });
+      let leaveCount = await Dbaccess.getdatacount("Ems_Notifications", {
+      isRead: false,
+      type: "Leave Action",
+      empId: empId,
+    });
       res.status(200).json({
         status: 200,
         message: "Record Found",
@@ -426,6 +441,8 @@ routes.get(
           totalWorkingDays: workingDays,
         },
         attendance,
+        permCount,
+        leaveCount
       }); 
     } catch (err) {
       console.error(err);
