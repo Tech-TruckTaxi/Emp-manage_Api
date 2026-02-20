@@ -73,6 +73,9 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
       fromDate: req.body.fromDate,
       toDate: req.body.toDate,
       reason: req.body.reason,
+      isHalfDay: req.body.isHalfDay || false,
+      fromTime: req.body.fromTime || null,
+      toTime: req.body.toTime || null,
     };
 
     const reqDataValidateResp = await validation.ValidateRequestData(params);
@@ -94,11 +97,25 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
     // Calculate number of leave days (inclusive)
     fromDate.setHours(0, 0, 0, 0);
     toDate.setHours(0, 0, 0, 0);
-
-    // @ts-ignore
-    const diffTime = toDate - fromDate;
-    const noOfDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
+    if (params.isHalfDay) {
+      const fromTime = params.fromTime;
+      const toTime = params.toTime;
+      if (!fromTime || !toTime) {
+        return res.status(400).json({
+          status: 400,
+          message: "fromTime and toTime are required for half-day leave",
+        });
+      }
+      const fromDateTime = new Date(`${params.fromDate} ${fromTime}`);
+      const toDateTime = new Date(`${params.toDate} ${toTime}`);
+      // @ts-ignore
+      const diffMs = toDateTime - fromDateTime;
+      var noOfDays = diffMs / (1000 * 60 * 60 * 24);
+    } else {
+      // @ts-ignore
+      const diffTime = toDate - fromDate;
+      var noOfDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
     // Generate leaveId
     const lastLeave = await Dbaccess.getdata(
       "EmpLeave",
@@ -110,26 +127,36 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
     const leaveId = lastLeave.length > 0 ? lastLeave[0].leaveId + 1 : 1;
 
     // Insert leave request
-    await Dbaccess.insertone("EmpLeave", {
+    const insertResp = await Dbaccess.insertone("EmpLeave", {
       leaveId: leaveId,
       empName: params.empName,
       empId: params.empId,
       leaveType: params.leaveType,
       fromDate: new Date(params.fromDate),
       toDate: new Date(params.toDate),
+      isHalfDay: params.isHalfDay,
+      fromTime: params.fromTime,
+      toTime: params.toTime,
       reason: params.reason,
       noOfDays: noOfDays,
       leaveReqTime: new Date(),
       status: "pending",
     });
-    await Dbaccess.insertone("Ems_Notifications", {
+    const notifiResp = await Dbaccess.insertone("Ems_Notifications", {
       empId: params.empId,
-      message: `Leave request submitted from ${params.fromDate} to ${params.toDate}`,
-      type: "Leave Request ",
+      message: `Leave request by ${params.empName} `,
+      type: "Leave Request",
       sentDate: new Date(),
       isRead: false,
     });
-    res.status(200).json({
+    if(!insertResp || !notifiResp){
+      return res.status(400).json({
+        status: 400,
+        message: "Failed to submit leave request",
+      });
+    }
+   return res.status(200).json({
+      status: 200,
       message: "Leave request submitted",
     });
   } catch (error) {
@@ -204,8 +231,8 @@ routes.post(
 
       await Dbaccess.insertone("Ems_Notifications", {
         empId: params.empId,
-        message: `Permission request submitted for ${params.date} from ${params.fromTime} to ${params.toTime}`,
-        type: "Permission Request ",
+        message: `Permission request by ${params.empName} `,
+        type: "Permission Request",
         sentDate: new Date(),
         isRead: false,
       });
@@ -399,7 +426,7 @@ routes.get(
           totalWorkingDays: workingDays,
         },
         attendance,
-      });
+      }); 
     } catch (err) {
       console.error(err);
       res.status(500).json({ status: 500, message: "Internal Server Error" });
@@ -418,6 +445,18 @@ routes.get(
       return res.send(reqDataValidateResp);
     }
     let tablename = "Ems_Notifications";
+    // Auto-mark notifications as read after 24 hours based on sentDate
+    const cutoffDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await Dbaccess.updatemany(
+      tablename,
+      { isRead: true },
+      {
+        isRead: false,
+        type: { $in: ["Permission Action", "Leave Action"] },
+        empId: empId,
+        sentDate: { $lte: cutoffDate },
+      },
+    );
     let find = {
       isRead: false,
       type: { $in: ["Permission Action", "Leave Action"] },
@@ -426,17 +465,32 @@ routes.get(
     let project = {};
     let sort = { sentDate: -1 };
     let result = await Dbaccess.getdata(tablename, find, project, sort);
+    let permCount = await Dbaccess.getdatacount("Ems_Notifications", {
+      isRead: false,
+      type: "Permission Action",
+      empId: empId,
+    });
+      let leaveCount = await Dbaccess.getdatacount("Ems_Notifications", {
+      isRead: false,
+      type: "Leave Action",
+      empId: empId,
+    });
+    
     if (result.length != 0) {
       var ResponseData = [];
       for (let index = 0; index < result.length; index++) {
         var obj = result[index];
         delete obj._id;
+        const permStatus = obj.message.includes("Permission") ? obj.message.split(" ")[1] : null;
+        const leaveStatus = obj.message.includes("Leave") ? obj.message.split(" ")[1] : null;
+        obj.status = permStatus || leaveStatus || null;
+
         ResponseData.push(obj);
       }
       res.status(200).json({
         status: 200,
         message: "Records found",
-        data: ResponseData,
+        data: ResponseData,permCount,leaveCount
       });
     } else {
       res.status(404).json({

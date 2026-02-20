@@ -103,7 +103,7 @@ routes.post("/addpermAction", Dbaccess.authenticateToken, async (req, res) => {
     }
 
     // Update status
-    const updatedStatus = action === "approve" ? "approved" : "rejected";
+    const updatedStatus = action === "approve" ? "Approved" : "Rejected";
 
     await Dbaccess.updateone(
       "EmpPermission",
@@ -129,7 +129,7 @@ routes.post("/addpermAction", Dbaccess.authenticateToken, async (req, res) => {
     return res.status(200).json({
       status: 200,
       message:
-        updatedStatus === "approved"
+        updatedStatus === "Approved"
           ? "Permission approved successfully"
           : "Permission rejected successfully",
     });
@@ -297,9 +297,20 @@ routes.get(
   Dbaccess.authenticateToken,
   async function (req, res) {
     let tablename = "Ems_Notifications";
+    // Auto-mark notifications as read after 24 hours based on sentDate
+    const cutoffDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await Dbaccess.updatemany(
+      tablename,
+      { isRead: true },
+      {
+        isRead: false,
+        type: { $in: ["Permission Request", "Leave Request"] },
+        sentDate: { $lte: cutoffDate },
+      },
+    );
     let find = {
       isRead: false,
-      type: { $in: ["Permission Request ", "Leave Request "] },
+      type: { $in: ["Permission Request", "Leave Request"] },
     };
     let project = {};
     let sort = { sentDate: -1 };
