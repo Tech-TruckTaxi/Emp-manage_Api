@@ -73,16 +73,19 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
       fromDate: req.body.fromDate,
       toDate: req.body.toDate,
       reason: req.body.reason,
-      //isHalfDay: req.body.isHalfDay || false,
-      //fromTime: req.body.fromTime || null,
-     // toTime: req.body.toTime || null,
     };
 
     const reqDataValidateResp = await validation.ValidateRequestData(params);
     if (reqDataValidateResp.respCode !== 2) {
       return res.send(reqDataValidateResp);
     }
-
+    var noOfDays = 0;
+    var session = null;
+    if( params.leaveType === "Half Day"){
+      noOfDays = 0.5;
+      session = req.body.session; // "Morning" or "Afternoon"
+    }
+else{
     const fromDate = new Date(params.fromDate);
     const toDate = new Date(params.toDate);
 
@@ -97,25 +100,11 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
     // Calculate number of leave days (inclusive)
     fromDate.setHours(0, 0, 0, 0);
     toDate.setHours(0, 0, 0, 0);
-   /*  if (params.isHalfDay) {
-      const fromTime = params.fromTime;
-      const toTime = params.toTime;
-      if (!fromTime || !toTime) {
-        return res.status(400).json({
-          status: 400,
-          message: "fromTime and toTime are required for half-day leave",
-        });
-      }
-      const fromDateTime = new Date(`${params.fromDate} ${fromTime}`);
-      const toDateTime = new Date(`${params.toDate} ${toTime}`);
-      // @ts-ignore
-      const diffMs = toDateTime - fromDateTime;
-      var noOfDays = diffMs / (1000 * 60 * 60 * 24);
-    } else { */
+  
       // @ts-ignore
       const diffTime = toDate - fromDate;
-      var noOfDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    //}
+      noOfDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  }
     // Generate leaveId
     const lastLeave = await Dbaccess.getdata(
       "EmpLeave",
@@ -134,12 +123,10 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
       leaveType: params.leaveType,
       fromDate: new Date(params.fromDate),
       toDate: new Date(params.toDate),
-      //isHalfDay: params.isHalfDay,
-      //fromTime: params.fromTime,
-      //toTime: params.toTime,
       reason: params.reason,
       noOfDays: noOfDays,
       leaveReqTime: new Date(),
+      session: session,
       status: "pending",
     });
     const notifiResp = await Dbaccess.insertone("Ems_Notifications", {
