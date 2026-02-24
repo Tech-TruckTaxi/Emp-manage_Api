@@ -81,30 +81,29 @@ routes.post("/addleave", Dbaccess.authenticateToken, async function (req, res) {
     }
     var noOfDays = 0;
     var session = null;
-    if( params.leaveType === "Half Day"){
+    if (params.leaveType === "Half Day") {
       noOfDays = 0.5;
       session = req.body.session; // "Morning" or "Afternoon"
-    }
-else{
-    const fromDate = new Date(params.fromDate);
-    const toDate = new Date(params.toDate);
+    } else {
+      const fromDate = new Date(params.fromDate);
+      const toDate = new Date(params.toDate);
 
-    //  Validate date range
-    if (fromDate > toDate) {
-      return res.status(400).json({
-        status: 400,
-        message: "From date cannot be greater than To date",
-      });
-    }
+      //  Validate date range
+      if (fromDate > toDate) {
+        return res.status(400).json({
+          status: 400,
+          message: "From date cannot be greater than To date",
+        });
+      }
 
-    // Calculate number of leave days (inclusive)
-    fromDate.setHours(0, 0, 0, 0);
-    toDate.setHours(0, 0, 0, 0);
-  
+      // Calculate number of leave days (inclusive)
+      fromDate.setHours(0, 0, 0, 0);
+      toDate.setHours(0, 0, 0, 0);
+
       // @ts-ignore
       const diffTime = toDate - fromDate;
       noOfDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  }
+    }
     // Generate leaveId
     const lastLeave = await Dbaccess.getdata(
       "EmpLeave",
@@ -136,13 +135,13 @@ else{
       sentDate: new Date(),
       isRead: false,
     });
-    if(!insertResp || !notifiResp){
+    if (!insertResp || !notifiResp) {
       return res.status(400).json({
         status: 400,
         message: "Failed to submit leave request",
       });
     }
-   return res.status(200).json({
+    return res.status(200).json({
       status: 200,
       message: "Leave request submitted",
     });
@@ -190,43 +189,85 @@ routes.post(
       // @ts-ignore
       const diffMs = toDateTime - fromDateTime;
       const permissionHours = (diffMs / (1000 * 60 * 60)).toFixed(2);
+      if (Number(permissionHours) > 3) {
+        const lastLeave = await Dbaccess.getdata(
+          "EmpLeave",
+          {},
+          {},
+          { leaveId: -1 },
+        );
 
-      // Generate permId
-      const lastPermission = await Dbaccess.getdata(
-        "EmpPermission",
-        {},
-        {},
-        { permId: -1 },
-      );
+        const leaveId = lastLeave.length > 0 ? lastLeave[0].leaveId + 1 : 1;
 
-      const permId =
-        lastPermission.length > 0 ? lastPermission[0].permId + 1 : 1;
+        // Insert leave request
+        const insertResp = await Dbaccess.insertone("EmpLeave", {
+          leaveId: leaveId,
+          empName: params.empName,
+          empId: params.empId,
+          leaveType: "Half Day",
+          fromDate: new Date(params.date),
+          toDate: new Date(params.date),
+          reason: params.reason,
+          noOfDays: permissionHours,
+          leaveReqTime: new Date(),
+          session: "",
+          status: "pending",
+        });
+        const notifiResp = await Dbaccess.insertone("Ems_Notifications", {
+          empId: params.empId,
+          message: `Leave request by ${params.empName} `,
+          type: "Leave Request",
+          sentDate: new Date(),
+          isRead: false,
+        });
+        if (!insertResp || !notifiResp) {
+          return res.status(400).json({
+            status: 400,
+            message: "Failed to submit leave request",
+          });
+        }
+        return res.status(200).json({
+          status: 200,
+          message: "Leave request submitted",
+        });
+      } else {
+        // Generate permId
+        const lastPermission = await Dbaccess.getdata(
+          "EmpPermission",
+          {},
+          {},
+          { permId: -1 },
+        );
 
-      // Insert permission request
-      await Dbaccess.insertone("EmpPermission", {
-        permId: permId,
-        empName: params.empName,
-        empId: params.empId,
-        date: new Date(params.date),
-        fromTime: params.fromTime,
-        toTime: params.toTime,
-        reason: params.reason,
-        permHours: Number(permissionHours),
-        permReqDate: new Date(),
-        status: "pending",
-      });
+        const permId =
+          lastPermission.length > 0 ? lastPermission[0].permId + 1 : 1;
 
-      await Dbaccess.insertone("Ems_Notifications", {
-        empId: params.empId,
-        message: `Permission request by ${params.empName} `,
-        type: "Permission Request",
-        sentDate: new Date(),
-        isRead: false,
-      });
+        // Insert permission request
+        await Dbaccess.insertone("EmpPermission", {
+          permId: permId,
+          empName: params.empName,
+          empId: params.empId,
+          date: new Date(params.date),
+          fromTime: params.fromTime,
+          toTime: params.toTime,
+          reason: params.reason,
+          permHours: Number(permissionHours),
+          permReqDate: new Date(),
+          status: "pending",
+        });
 
-      res.status(200).json({
-        message: "Permission request submitted",
-      });
+        await Dbaccess.insertone("Ems_Notifications", {
+          empId: params.empId,
+          message: `Permission request by ${params.empName} `,
+          type: "Permission Request",
+          sentDate: new Date(),
+          isRead: false,
+        });
+
+        res.status(200).json({
+          message: "Permission request submitted",
+        });
+      }
     } catch (error) {
       console.error(error);
       res.status(500).json({
@@ -398,20 +439,20 @@ routes.get(
         workingDays++;
       }
       let find = {
-      isRead: false,
-      type: { $in: ["Permission Action", "Leave Action"] },
-      empId: empId,
-    };
-    let permCount = await Dbaccess.getdatacount("Ems_Notifications", {
-      isRead: false,
-      type: "Permission Action",
-      empId: empId,
-    });
+        isRead: false,
+        type: { $in: ["Permission Action", "Leave Action"] },
+        empId: empId,
+      };
+      let permCount = await Dbaccess.getdatacount("Ems_Notifications", {
+        isRead: false,
+        type: "Permission Action",
+        empId: empId,
+      });
       let leaveCount = await Dbaccess.getdatacount("Ems_Notifications", {
-      isRead: false,
-      type: "Leave Action",
-      empId: empId,
-    });
+        isRead: false,
+        type: "Leave Action",
+        empId: empId,
+      });
       res.status(200).json({
         status: 200,
         message: "Record Found",
@@ -429,8 +470,8 @@ routes.get(
         },
         attendance,
         permCount,
-        leaveCount
-      }); 
+        leaveCount,
+      });
     } catch (err) {
       console.error(err);
       res.status(500).json({ status: 500, message: "Internal Server Error" });
@@ -474,19 +515,23 @@ routes.get(
       type: "Permission Action",
       empId: empId,
     });
-      let leaveCount = await Dbaccess.getdatacount("Ems_Notifications", {
+    let leaveCount = await Dbaccess.getdatacount("Ems_Notifications", {
       isRead: false,
       type: "Leave Action",
       empId: empId,
     });
-    
+
     if (result.length != 0) {
       var ResponseData = [];
       for (let index = 0; index < result.length; index++) {
         var obj = result[index];
         delete obj._id;
-        const permStatus = obj.message.includes("Permission") ? obj.message.split(" ")[1] : null;
-        const leaveStatus = obj.message.includes("Leave") ? obj.message.split(" ")[1] : null;
+        const permStatus = obj.message.includes("Permission")
+          ? obj.message.split(" ")[1]
+          : null;
+        const leaveStatus = obj.message.includes("Leave")
+          ? obj.message.split(" ")[1]
+          : null;
         obj.status = permStatus || leaveStatus || null;
 
         ResponseData.push(obj);
@@ -494,7 +539,9 @@ routes.get(
       res.status(200).json({
         status: 200,
         message: "Records found",
-        data: ResponseData,permCount,leaveCount
+        data: ResponseData,
+        permCount,
+        leaveCount,
       });
     } else {
       res.status(404).json({
